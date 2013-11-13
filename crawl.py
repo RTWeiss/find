@@ -5,7 +5,7 @@
 
  # Description:      The main body of the program.
 
- # Requirements:     pymysql, python3
+ # Requirements:     Pymysql, Python3, Access to a mysql server
 
  # Author:           Noah Ingham
 
@@ -25,14 +25,14 @@ id='id'
  # Defining python functions for common SQL calls
 
 def delete(row):
-    sql.execute("DELETE FROM links WHERE id=" + row[0])
+    sql.execute("DELETE FROM links WHERE id=%s" %(row[0]))
 
 def update(row, field, value):
-    sql.execute("UPDATE links SET $s=$s WHERE id=$s" %(field, value, row[0]))
+    sql.execute("UPDATE links SET %s=%s WHERE id=%s" %(field, value, row[0]))
 
 def select(field=id, value=False):
     if value:
-        sql.execute("SELECT * FROM links WHERE %s=%s" %(field, value))
+        sql.execute("SELECT * FROM links WHERE %s='%s'" %(field, value))
     else:
         sql.execute("SELECT * FROM links")
     return sql.fetchall()
@@ -41,7 +41,7 @@ def insert(url):
     sql.execute("INSERT INTO links(url, parsed) VALUES('%s', 0)" %(url))
 
 def email(address, site):
-    sql.execute("INSERT INTO emails(adrress, site) VALUES(%s, %s)" %(address, site))
+    sql.execute("INSERT INTO emails(address, site) VALUES('%s', '%s')" %(address, site))
 
  # Connection to the server
 
@@ -68,7 +68,7 @@ else:
 
 def parse(url):
 
-     # I request the HTML code.
+    # I request the HTML code.
 
     html=urlopen(url).read().decode('utf-8')
 
@@ -79,14 +79,59 @@ def parse(url):
     keywords = re.findall( r"""<meta name="keywords" content=['"](.*?)['"]>""", html)
     description = re.findall( r"""<meta name="description" content=['"](.*?)['"]>""", html)
     h1 = re.findall( r'<h1>(.*?)</h1>', html)
-    words = [x.lower().strip("""#"'/?.@""") for x in title + keywords + description + h1]
-    words = list(set(words))
-    print(words)
-    print(links)
-
-parse(start)
+    return links, title, keywords, description, h1
 
 # -----END PARSER BLOCK
+
+
+
+
+
+
+
+
+
+
+
+# -----BEGIN CRAWLER BLOCK-----
+
+def checkUrl(url, link):
+    if url[:7]=='mailto:':
+        email(url, link)
+        return url[8:]
+    elif url[:7]!='http://' and url[:8]!='https://':
+        url = link+url
+    if url[:4] != 'http':
+        url = 'http://'+url
+    if url[-1] != '/':
+        url += '/'
+    if url[7:11]=='www.':
+        url = url[:7]+url[11:]
+    if url[8:11]=='www.':
+        url = url[:8]+url[12:]
+    return url
+
+
+link = start
+linksl, title, keywords, description,h1 = parse(link)
+
+string = ""
+for x in (title + keywords + description + h1):
+    string += ''.join([e for e in x.lower() if e.isalnum() or e==' '])
+string = list(set(string.split(' ')))
+
+links = []
+for l in linksl:
+    if l not in links:
+        links.append(l)
+for url in links:
+    url=checkUrl(url, link)
+    print(url)
+
+# -----END CRAWLER BLOCK-----
+
+
+
 
 
 
@@ -99,3 +144,4 @@ mysql.commit()
 sql.close()
 
 # -----END FOOTER BLOCK
+
