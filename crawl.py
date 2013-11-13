@@ -98,7 +98,7 @@ def parse(url):
 def checkUrl(url, link):
     if url[:7]=='mailto:':
         email(url, link)
-        return url[8:]
+        return url[7:]
     elif url[:7]!='http://' and url[:8]!='https://':
         url = link+url
     if url[:4] != 'http':
@@ -111,7 +111,11 @@ def checkUrl(url, link):
         url = url[:8]+url[12:]
     return url
 
-
+def baseUrl(url):
+    if url[:4]=='http':
+        return url[:url.find('/',8)+1]
+    else:
+        return checkUrl(url[url.find('@')+1:], '')
 link = start
 linksl, title, keywords, description,h1 = parse(link)
 
@@ -126,7 +130,7 @@ for l in linksl:
         links.append(l)
 for url in links:
     url=checkUrl(url, link)
-    print(url)
+    print(baseUrl(url))
 
 # -----END CRAWLER BLOCK-----
 
