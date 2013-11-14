@@ -18,8 +18,6 @@ from urllib.request import urlopen
 
 # -----BEGIN MYSQL BLOCK-----
 
-parsed='parsed'
-id='id'
 
 
  # Defining python functions for common SQL calls
@@ -30,9 +28,9 @@ def delete(url):
         sql.execute("DELETE FROM links WHERE id=%s" %(id))
 
 def update(row, field, value):
-    sql.execute("UPDATE links SET %s='%s' WHERE id='%s'" %(field, value, row))
+        sql.execute("UPDATE links SET %s='%s' WHERE id='%s'" %(field, value, row))
 
-def select(field=id, value=''):
+def select(field='id', value=''):
     if value != '':
         sql.execute("SELECT * FROM links WHERE %s='%s'" %(field, value))
     else:
@@ -80,7 +78,7 @@ def reset():
 
  # Connection to the server
 
-mysql = pymysql.connect(user='testpy', db='crawler')
+mysql = pymysql.connect(user='testpy', db='crawler', charset='utf8')
 sql = mysql.cursor()
 #insert('http://google.com/', '0')
  # The initial URL to parse. Either a user-defined one or the first one in the table.
@@ -105,15 +103,19 @@ def parse(url):
 
     # I request the HTML code.
     try:
-        html=urlopen(url).read().decode('utf-8')
+        html=urlopen(url).read().decode('utf8')
     except:
         return 'crash',0,0,0,0
+    #for code in ['\u2022','\u0153', '\u2021', '\u0178', '\u201e', '\u2014', '\u2013', '\u2019']:
+    #    html = html.replace(code, '')
+
      # I look for links, titles, meta-data and headings.
 
     links = re.findall( r"""<a\s+.*?href=['"](.*?)['"].*?(?:</a|/)>""", html)
+    links += re.findall( r"""<link\s+.*?href=['"](.*?)['"].*?(?:</link|/|)>""", html)
     title = re.findall( r'<title>(.*?)</title>', html)
     keywords = re.findall( r"""<meta name="keywords" content=['"](.*?)['"]>""", html)
-    description = re.findall( r"""<meta name="description" content=['"](.*?)['"]>""", html)
+    description = re.findall( r"""<meta name="description" content=['"](.*?)['"/]>""", html)
     h1 = re.findall( r'<h1>(.*?)</h1>', html)
     return links, title, keywords, description, h1
 
@@ -125,8 +127,10 @@ def parse(url):
 # -----BEGIN CRAWLER BLOCK-----
 
 def checkUrl(url, link):
+    if url.find('?') != -1:
+        url = url[:url.find('?')]
     if url[:7]=='mailto:':
-        url = url[7:url.find('?')]
+        url = url[7:]
         email(url, link)
         return url
     elif url[:7]!='http://' and url[:8]!='https://':
@@ -139,6 +143,14 @@ def checkUrl(url, link):
         url = url[:7]+url[11:]
     if url[8:12]=='www.':
         url = url[:8]+url[12:]
+    if url[7:12]=='www1.':
+        url = url[:7]+url[12:]
+    if url[8:13]=='www1.':
+        url = url[:8]+url[13:]
+    if url[7:12]=='www2.':
+        url = url[:7]+url[12:]
+    if url[8:13]=='www2.':
+        url = url[:8]+url[13:]
     return url
 
 def baseUrl(url):
@@ -149,7 +161,6 @@ def baseUrl(url):
 
 if not start:
     start = select('parsed', '0')[1]
-counter = 0
 try:
     while True:
         link = start
@@ -191,11 +202,7 @@ try:
         update(linkId, 'title', str(title[0].replace("'", '"')))
         update(linkId, 'descr', str(description[0].replace("'", '`')))
         start = select('parsed', '0')[1]
-        if counter > 29:
-            print('Saving...')
-            mysql.commit()
-            counter = 0
-        counter += 1
+        mysql.commit()
 except KeyboardInterrupt:
     print('Saving...')
 
