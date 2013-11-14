@@ -1,12 +1,17 @@
 find
 ====
 
-A Python Web Crawler and Search Engine
+A Python Web Crawler and Search Engine, using MySQL.
+
+It is split up into two parts (crawl.py and find.py).
+
+So far it's not very accessable. I  plan on making a web interface for it, mainly to learn about backend web development (Django).
+
+The search engine is currently quite basic - it orders the sites per query based on the amount of pages that link to them.
+
+It ignores subdomains and it only looks at the default page. This reults in less specific results but a broader range.
 
 
-In repeating a personal project from a year or two ago, I'll beable to judge where I have improved and where I haven't.
+Here is the search interface, so far:
 
-This time I plan on making a web interface search engine, to learn about backend web development (Django).
-
-So far, the search engine is quite basic.
-I orders the sides per query based on the amount of pages that link to them.
+![alt text](http://i.imgur.com/ujCKfuR.png)
