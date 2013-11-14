@@ -1,9 +1,9 @@
 
 # -----BEGIN HEADER BLOCK-----
 
- # File:             crawler.crawl.py
+ # File:             crawler.find.py
 
- # Description:      The main body of the program.
+ # Description:      The search engine interface.
 
  # Requirements:     Pymysql, Python3, Access to a mysql server
 
@@ -12,7 +12,7 @@
 # -----END HEADER BLOCK-----
 
 
-import sys,pymysql,re
+import sys,pymysql
 
 # -----BEGIN MYSQL BLOCK-----
 
@@ -50,7 +50,9 @@ mysql = pymysql.connect(user='testpy', db='crawler')
 sql = mysql.cursor()
 
 if len(sys.argv)>1:
-    lookup = sys.argv[1]
+    lookup=[]
+    for x in range(len(sys.argv)-1):
+        lookup += sys.argv[x]
 else:
     lookup = input('>>> ')
 
@@ -59,6 +61,7 @@ else:
 
 # -----START LOOKUP BLOCK-----
 dicti = {}
+for x in
 resp = lookUp(lookup)
 if not resp:
     print('No results.')
@@ -79,16 +82,13 @@ else:
             print(result[5])
         print('\033[95m'+result[1]+'\033[0m')
 
-# -----END LOOKUP BLOCK
+# -----END LOOKUP BLOCK-----
 
 
 
-
-
-
-# -----BEGIN FOOTER BLOCK
+# -----BEGIN FOOTER BLOCK-----
 
 sql.close()
 
-# -----END FOOTER BLOCK
+# -----END FOOTER BLOCK-----
 

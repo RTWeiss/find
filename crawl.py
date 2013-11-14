@@ -30,7 +30,9 @@ def delete(url):
 def update(row, field, value):
         sql.execute("UPDATE links SET %s='%s' WHERE id='%s'" %(field, value, row))
 
-def select(field='id', value=''):
+def select(field='id', value='', newUrl=False):
+    if newUrl:
+        sql.execute("SELECT * FROM links WHERE %s='%s' and LENGTH(linkedto) > 10" %(field, value))
     if value != '':
         sql.execute("SELECT * FROM links WHERE %s='%s'" %(field, value))
     else:
@@ -80,7 +82,7 @@ def reset():
 
 mysql = pymysql.connect(user='testpy', db='crawler', charset='utf8')
 sql = mysql.cursor()
-#insert('http://google.com/', '0')
+
  # The initial URL to parse. Either a user-defined one or the first one in the table.
 start = 0
 if len(sys.argv)>1:
@@ -88,8 +90,7 @@ if len(sys.argv)>1:
     idstart = getId(start)
     if not idstart:
         insert(start)
-if len(sys.argv)>2:
-    reset()
+
 # -----END MYSQL BLOCK-----
 
 
@@ -106,8 +107,6 @@ def parse(url):
         html=urlopen(url).read().decode('utf8')
     except:
         return 'crash',0,0,0,0
-    #for code in ['\u2022','\u0153', '\u2021', '\u0178', '\u201e', '\u2014', '\u2013', '\u2019']:
-    #    html = html.replace(code, '')
 
      # I look for links, titles, meta-data and headings.
 
@@ -117,6 +116,7 @@ def parse(url):
     keywords = re.findall( r"""<meta name="keywords" content=['"](.*?)['"]>""", html)
     description = re.findall( r"""<meta name="description" content=['"](.*?)['"/]>""", html)
     h1 = re.findall( r'<h1>(.*?)</h1>', html)
+
     return links, title, keywords, description, h1
 
 # -----END PARSER BLOCK
@@ -139,18 +139,18 @@ def checkUrl(url, link):
         url = 'http://'+url
     if url[-1] != '/':
         url += '/'
-    if url[7:11]=='www.':
-        url = url[:7]+url[11:]
-    if url[8:12]=='www.':
-        url = url[:8]+url[12:]
-    if url[7:12]=='www1.':
-        url = url[:7]+url[12:]
-    if url[8:13]=='www1.':
-        url = url[:8]+url[13:]
-    if url[7:12]=='www2.':
-        url = url[:7]+url[12:]
-    if url[8:13]=='www2.':
-        url = url[:8]+url[13:]
+    ht = url.find('//') + 2
+    if url[ht:ht+4]=='www.':
+        url = url[:ht]+url[ht+4:]
+    if url[ht:ht+5]=='www1.':
+        url = url[:ht]+url[ht+5:]
+    if url[ht:ht+5]=='www2.':
+        url = url[:ht]+url[ht+5:]
+    if url[:url.find('/', ht)].count('.') > 1:
+        end1 = url.find('.') + 1
+        second = url[end1:url.find('.', end1)]
+        if len(second) > 3 and second != 'tumblr':
+            url = url[:ht] + url[end1:]
     return url
 
 def baseUrl(url):
@@ -201,7 +201,7 @@ try:
         update(linkId, 'parsed', '1')
         update(linkId, 'title', str(title[0].replace("'", '"')))
         update(linkId, 'descr', str(description[0].replace("'", '`')))
-        start = select('parsed', '0')[1]
+        start = select('parsed', '0', True)[1]
         mysql.commit()
 except KeyboardInterrupt:
     print('Saving...')
@@ -214,10 +214,10 @@ except KeyboardInterrupt:
 
 
 
-# -----BEGIN FOOTER BLOCK
+# -----BEGIN FOOTER BLOCK-----
 
 mysql.commit()
 sql.close()
 
-# -----END FOOTER BLOCK
+# -----END FOOTER BLOCK-----
 
