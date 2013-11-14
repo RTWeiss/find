@@ -24,14 +24,16 @@ id='id'
 
  # Defining python functions for common SQL calls
 
-def delete(row):
-    sql.execute("DELETE FROM links WHERE id=%s" %(row[0]))
+def delete(url):
+    id = select('url', url)[0]
+    if id:
+        sql.execute("DELETE FROM links WHERE id=%s" %(id))
 
 def update(row, field, value):
     sql.execute("UPDATE links SET %s='%s' WHERE id='%s'" %(field, value, row))
 
-def select(field=id, value=False):
-    if value:
+def select(field=id, value=''):
+    if value != '':
         sql.execute("SELECT * FROM links WHERE %s='%s'" %(field, value))
     else:
         sql.execute("SELECT * FROM links")
@@ -41,7 +43,7 @@ def select(field=id, value=False):
     else:
         return ()
 
-def insert(url, linkedto=[], title='', description=''):
+def insert(url, linkedto='0', title='', description=''):
     sql.execute("INSERT INTO links(url, parsed, linkedto, title, descr) VALUES('%s', 0, '%s', '%s', '%s')" %(url, linkedto, title, description))
 
 
@@ -49,8 +51,13 @@ def email(address, site):
     sql.execute("INSERT INTO emails(address, site) VALUES('%s', '%s')" %(address, site))
 
 def keyword(word, url):
-    urlId = select('url', url)
-    sql.execute("INSERT INTO keywords(words, ids) VALUES('%s', '%s')" %(word, urlId))
+    sql.execute("SELECT * FROM keywords WHERE word='%s'" %(word))
+    resp = sql.fetchall()
+    if  len(resp) > 0:
+        ids = resp[0][1]
+        sql.execute("UPDATE keywords SET ids='%s' WHERE word='%s'" %(ids + ', ' + str(url), word))
+    else:
+        sql.execute("INSERT INTO keywords(word, ids) VALUES('%s', '%s')" %(word, url))
 
 def incrementor():
     sql.execute("SHOW TABLE STATUS LIKE 'links'")
@@ -58,6 +65,8 @@ def incrementor():
 
 def getId(url):
     sel = select('url', url)
+    if len(sel) == 0:
+        return 0
     return sel[0]
 
 
@@ -73,16 +82,16 @@ def reset():
 
 mysql = pymysql.connect(user='testpy', db='crawler')
 sql = mysql.cursor()
-reset()
-insert('http://google.com/', '0')
-
+#insert('http://google.com/', '0')
  # The initial URL to parse. Either a user-defined one or the first one in the table.
-
+start = 0
 if len(sys.argv)>1:
     start = sys.argv[1]
-else:
-    start = select(parsed, 0)[1]
-
+    idstart = getId(start)
+    if not idstart:
+        insert(start)
+if len(sys.argv)>2:
+    reset()
 # -----END MYSQL BLOCK-----
 
 
@@ -95,9 +104,10 @@ else:
 def parse(url):
 
     # I request the HTML code.
-
-    html=urlopen(url).read().decode('utf-8')
-
+    try:
+        html=urlopen(url).read().decode('utf-8')
+    except:
+        return 'crash',0,0,0,0
      # I look for links, titles, meta-data and headings.
 
     links = re.findall( r"""<a\s+.*?href=['"](.*?)['"].*?(?:</a|/)>""", html)
@@ -116,8 +126,9 @@ def parse(url):
 
 def checkUrl(url, link):
     if url[:7]=='mailto:':
+        url = url[7:url.find('?')]
         email(url, link)
-        return url[7:]
+        return url
     elif url[:7]!='http://' and url[:8]!='https://':
         url = link+url
     if url[:4] != 'http':
@@ -136,38 +147,57 @@ def baseUrl(url):
     else:
         return checkUrl(url[url.find('@')+1:], '')
 
+if not start:
+    start = select('parsed', '0')[1]
+counter = 0
+try:
+    while True:
+        link = start
+        print(link)
+        linkId = getId(link)
+        linksl, title, keywords, description,h1 = parse(link)
+        if linksl=='crash':
+            delete(link)
+            start = select('parsed', '0')[1]
+            continue
 
-link = start
-start = select(parsed, 0)[1]
-linkId = getId(link)
-linksl, title, keywords, description,h1 = parse(link)
-for check in [title, keywords, description, h1]:
-    if not check:
-        check += ' '
-string = ""
-for x in (title + keywords + description + h1):
-    string += ''.join([e for e in x.lower() if e.isalnum() or e==' '])
-string = [x for x in set(string.split(' ')) if x != '']
-
-links = []
-for l in linksl:
-    l = baseUrl(checkUrl(l, link))
-    if l not in links:
-        links.append(l)
-for linkn in links:
-    li = select('url', linkn)
-    print('\t%s' %linkn)
-    if len(li) == 0:
-        insert(linkn, linkId)
-    else:
-        idh = li[0]
-        linkedto = li[3]
-        if link not in linkedto:
-            linkedto += ', ' + str(linkId)
-        update(idh, 'linkedto', linkedto)
-for key in string:
-    print(key)
-    #li = select('word', 'google')
+        for check in [title, keywords, description, h1]:
+            if not check:
+                check.append(' ')
+        string = ""
+        for x in (title + keywords + description + h1):
+            string += ''.join([e for e in x.lower() if e.isalnum() or e==' '])
+        string = [x for x in set(string.split(' ')) if x != '']
+        if linksl:
+            links = []
+            for l in linksl:
+                l = baseUrl(checkUrl(l, link))
+                if l not in links:
+                    links.append(l)
+            for linkn in links:
+                li = select('url', linkn)
+                print('\t%s' %linkn)
+                if len(li) == 0:
+                    insert(linkn, linkId)
+                else:
+                    idh = li[0]
+                    linkedto = li[3]
+                    if str(linkId) not in linkedto:
+                        linkedto += ', ' + str(linkId)
+                    update(idh, 'linkedto', linkedto)
+        for key in string:
+            keyword(key, linkId)
+        update(linkId, 'parsed', '1')
+        update(linkId, 'title', str(title[0].replace("'", '"')))
+        update(linkId, 'descr', str(description[0].replace("'", '`')))
+        start = select('parsed', '0')[1]
+        if counter > 29:
+            print('Saving...')
+            mysql.commit()
+            counter = 0
+        counter += 1
+except KeyboardInterrupt:
+    print('Saving...')
 
 # -----END CRAWLER BLOCK-----
 
