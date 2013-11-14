@@ -14,4 +14,4 @@ I orders the sides per query based on the amount of pages that link to them.
 
 
 
-![alt text](http://i.imgur.com/ujCKfuR.png(
+![alt text](http://i.imgur.com/ujCKfuR.png)
