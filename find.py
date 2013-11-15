@@ -49,46 +49,49 @@ def getUrl(id):
 mysql = pymysql.connect(user='testpy', db='crawler')
 sql = mysql.cursor()
 
-if len(sys.argv)>1:
-    lookup=[]
-    for x in range(len(sys.argv)-1):
-        lookup += sys.argv[x]
-else:
-    lookup = input('>>> ')
 
 # -----END MYSQL BLOCK-----
 
 
 # -----START LOOKUP BLOCK-----
-dicti = {}
-for x in
-resp = lookUp(lookup)
-if not resp:
-    print('No results.')
-else:
-    for n in resp[0][1].split(', '):
-        whole = select('id', n)
-        if n != '0':
-            dicti[whole] = whole[3].count(',')
 
-    ordl = sorted(dicti.items(), key=lambda x: x[1], reverse=True)
+def look(lookup):
+    global sql
 
-    for result in ordl[:6]:
-        result = result[0]
-        print('')
-        if result[4] != ' ':
-            print(result[4])
-        if result[5] != ' ':
-            print(result[5])
-        print('\033[95m'+result[1]+'\033[0m')
+    dicti = {}
+    resp = lookUp(lookup)
+    if not resp:
+        print('No results.')
+    else:
+        for n in resp[0][1].split(', '):
+            whole = select('id', n)
+            if whole:
+                dicti[whole] = whole[3].count(',')
 
+        ordl = sorted(dicti.items(), key=lambda x: x[1], reverse=True)
+
+        for result in ordl[:6]:
+            result = result[0]
+            print('')
+            if result[4] != ' ':
+                print(result[4])
+            if result[5] != ' ':
+                print(result[5])
+            print('\033[95m'+result[1]+'\033[0m')
 # -----END LOOKUP BLOCK-----
 
 
 
 # -----BEGIN FOOTER BLOCK-----
-
-sql.close()
+if __name__=='__main__':
+    if len(sys.argv)>1:
+        lookup=''
+        #for x in range(len(sys.argv)-1):
+        lookup = sys.argv[1]
+    else:
+        lookup = input('>>> ')
+    look(lookup)
+    sql.close()
 
 # -----END FOOTER BLOCK-----
 
