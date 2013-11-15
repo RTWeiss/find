@@ -1,0 +1,33 @@
+#!/usr/bin/env python
+# -*- coding: UTF-8 -*-
+
+# enable debugging
+import cgitb, cgi
+cgitb.enable()
+
+print("Content-Type: text/html\r\n\r\n")
+print('')
+
+with open('html.html', 'r') as f:
+    print(f.read())
+
+form = cgi.FieldStorage()
+name = form.getvalue('query')
+if name:
+    import find
+    ordl = find.look(name)
+    if ordl:
+        for result in ordl[:6]:
+            result = result[0]
+            print('')
+            if result[4] != ' ':
+                print('<a class="rTitle" href="' + result[1] + '">'+result[4] + '</a><br />')
+            print('<span class="rLink">'+ result[1] + '</span><br />')
+            if result[5] != ' ':
+                print(   (result[5] + '<br />').strip(u'').replace('`', "'"))
+            print('<br />')
+        print('<a href="#">1</a> 2 3 4')
+    find.sql.close()
+
+
+    print('</div></body></html>')

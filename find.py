@@ -61,7 +61,7 @@ def look(lookup):
     dicti = {}
     resp = lookUp(lookup)
     if not resp:
-        print('No results.')
+        print('No results. Multiple words at a time are not yet supported.')
     else:
         for n in resp[0][1].split(', '):
             whole = select('id', n)
@@ -69,15 +69,7 @@ def look(lookup):
                 dicti[whole] = whole[3].count(',')
 
         ordl = sorted(dicti.items(), key=lambda x: x[1], reverse=True)
-
-        for result in ordl[:6]:
-            result = result[0]
-            print('')
-            if result[4] != ' ':
-                print(result[4])
-            if result[5] != ' ':
-                print(result[5])
-            print('\033[95m'+result[1]+'\033[0m')
+        return ordl
 # -----END LOOKUP BLOCK-----
 
 
@@ -90,7 +82,16 @@ if __name__=='__main__':
         lookup = sys.argv[1]
     else:
         lookup = input('>>> ')
-    look(lookup)
+    ordl = look(lookup)
+
+    for result in ordl[:6]:
+        result = result[0]
+        print('')
+        if result[4] != ' ':
+            print(result[4])
+        if result[5] != ' ':
+            print(result[5])
+        print('\033[95m'+result[1]+'\033[0m')
     sql.close()
 
 # -----END FOOTER BLOCK-----
