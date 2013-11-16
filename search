@@ -25,13 +25,12 @@ if name:
     if ordl:
         for result in ordl[(current-1)*6:current*6]:
             result = result[0]
-            if result[4] != '':
-                print('<a class="rTitle" href="' + result[1] + '">'+result[4].replace('"', "'") + '</a><br />')
-            else:
-                print('<a class="rTitle" href="' + result[1] + '">'+result[1][7].upper()+result[1][8:result[1].find('.')] + '</a><br />')
+            title = result[4]
+            if len(title) > 58:
+                title = title[:58] + '</a>...<a>'
+            print('<a class="rTitle" href="' + result[1] + '">'+title.replace('"', "'") + '</a><br />')
             print('<span class="rLink">'+ result[1] + '</span><br />')
-            if result[5] != ' ':
-                print(   (result[5] + '<br />').strip(u'').replace('`', "'"))
+            print(   (result[5] + '<br />').strip(u'').replace('`', "'"))
             print('<br />')
         count = len(ordl)
         print('<span class="subtle"><br />About %s results (%.2f seconds)</span>' %(count, count/1100))
@@ -40,11 +39,11 @@ if name:
             count = 60
             dots=True
         pstring='<br /><br /><span class="subtle"> Goto: '
-        for x in range(round(count/6) + 1*(count%6>0)):
+        for x in range(round((count-count%6)/6)+1):
             if x+1 == current:
                 pstring += ('<span style="color:black;">%s  </span>' %(current))
             else:
-                pstring += '<a class="nextP" href="search?query=%s&p=%s">%s</a>  ' %(name, x+1, x+1)
+                pstring += '<a class="nextP" href="search?q=%s&p=%s">%s</a>  ' %(name, x+1, x+1)
         if dots:
             pstring += '...'
         print(pstring + '</span>')

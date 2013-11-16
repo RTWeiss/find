@@ -51,6 +51,14 @@ def email(address, site):
     sql.execute("SELECT * FROM emails WHERE address='%s'" %address)
     if sql.fetchall() == ():
         sql.execute("INSERT INTO emails(address, site) VALUES('%s', '%s')" %(address, site))
+
+def dbdomain(domain):
+    sql.execute("SELECT * FROM domains WHERE domain='%s'" %domain)
+    if sql.fetchall() == ():
+        sql.execute("INSERT INTO domains(domain) VALUES('%s')" %(domain))
+        return True
+    return False
+
 def keyword(word, url):
     sql.execute("SELECT * FROM keywords WHERE word='%s'" %(word))
     resp = sql.fetchall()
@@ -70,19 +78,29 @@ def getId(url):
         return 0
     return sel[0]
 
+def domain(url):
+    subs = url[7:url.find('/', 8)]
+    subs = subs.split('.')
+    for x in range(len(subs)):
+        if len(subs[-x]) > 3:
+            return subs[-x]
+    return subs[0]
 
 def reset():
     sql.execute("DROP TABLE IF EXISTS links")
+    sql.execute("DROP TABLE IF EXISTS domains")
     #sql.execute("DROP TABLE IF EXISTS emails")
     sql.execute("DROP TABLE IF EXISTS keywords")
     sql.execute("CREATE TABLE links(id INT PRIMARY KEY AUTO_INCREMENT, url VARCHAR(256), parsed TINYINT(1), linkedto TEXT, title VARCHAR(128), descr VARCHAR(256), h1 VARCHAR(256))")
     #sql.execute("CREATE TABLE emails(id INT PRIMARY KEY AUTO_INCREMENT, address VARCHAR(256), site VARCHAR(256))")
+    sql.execute("CREATE TABLE domains(id INT PRIMARY KEY AUTO_INCREMENT, domain VARCHAR(256))")
     sql.execute("CREATE TABLE keywords(word VARCHAR(40), ids TEXT)")
 
  # Connection to the server
 
 mysql = pymysql.connect(user='testpy', db='crawler', charset='utf8')
 sql = mysql.cursor()
+reset()
  # The initial URL to parse. Either a user-defined one or the first one in the table.
 start = 0
 if len(sys.argv)>1:
@@ -115,7 +133,14 @@ def parse(url):
     title = (re.findall( r'<title>(.*?)</title>', html) + [''])[0]
     keywords = (re.findall( r"""<meta name="keywords" content=['"](.*?)['"]>""", html)+[''])[0]
     description = (re.findall( r"""<meta name="description" content=['"](.*?)['"]\s+.*?>""", html)+[''])[0]
+    emails = (re.findall( r"""\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,4}\b""", html))
+    for em in emails:
+        print(email)
+        email(url, em)
 
+    dom = domain(url)
+    if not title:
+        title = dom
     # Gets really messy from here (if it wasn't already messy enough for you).
     i,h1 = 1, []
     while not len(h1) and i < 7:
@@ -125,9 +150,11 @@ def parse(url):
     while h1.count('<'):
         spot = h1.find('<')
         h1 = h1[:spot]+h1[h1.find('>', spot)+1:]
+    if not description:
+        description = dom[0].upper() + dom[1:] + ' - ' + h1
     ret = [links]
     for ttl in [title, keywords, description, h1]:
-        ttl = ''.join(c for c in ttl if c in '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!"#$%&\'()*+,-./:;?@[\\]^_`{|}~ \t\n\r')
+        ttl = ''.join(c for c in ttl if c in '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!"#$%&\'()*+,-./:;?@[\\]^_`{|}~– \t\n\r')
         ret.append(ttl)
     return ret
 
@@ -137,14 +164,6 @@ def parse(url):
 
 
 # -----BEGIN CRAWLER BLOCK-----
-
-def domain(url):
-    subs = url[7:url.find('/', 8)]
-    subs = subs.split('.')
-    for x in range(len(subs)):
-        if len(subs[-x]) > 3:
-            return subs[-x]
-    return subs[0]
 
 def checkUrl(url, link):
     if url[:11]=='javascript:' or '>' in url or '<' in url or '.' not in url or '{' in url or '}' in url:
@@ -173,8 +192,6 @@ def checkUrl(url, link):
         second = url[end1:url.find('.', end1)]
         if len(second) > 3 and second != 'tumblr':
             url = url[:ht] + url[end1:]
-    if domain(url) == domain(link):
-        return ''
     return url
 
 def baseUrl(url):
@@ -188,6 +205,10 @@ if not start:
 try:
     while True:
         link = start
+        if not dbdomain(domain(link)):
+            delete(link)
+            start = select('parsed', '0', True)[1]
+            continue
         print(link)
         linkId = getId(link)
         [linksl, title, keywords, description,h1] = parse(link)
@@ -201,6 +222,7 @@ try:
         for x in (title + keywords + description + h1):
             string += ''.join([e for e in x.lower() if e.isalnum() or e==' '])
         string = [x for x in set(string.split(' ')) if x != '']
+        string += [domain(link)]
         if linksl:
             links = []
             for l in linksl:
