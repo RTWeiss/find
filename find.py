@@ -59,7 +59,13 @@ def look(lookup):
     global sql
 
     dicti = {}
-    respi = lookUp(lookup)
+    resplist=[]
+    respi = ''
+    #for x in lookup.split(' '):
+    #    xlookup = lookUp(x)[0]
+    #    resplist.append(xlookup)
+    #    respi += xlookup[1]
+    respi=lookUp(lookup)
     if not respi:
         print('No results. Multiple words at a time are not yet supported.')
         return False, False

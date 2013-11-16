@@ -12,8 +12,7 @@
 # -----END HEADER BLOCK-----
 
 
-import sys,pymysql,re
-from urllib.request import urlopen
+import sys,pymysql,re, urllib.request
 
 
 # -----BEGIN MYSQL BLOCK-----
@@ -30,11 +29,9 @@ def delete(url):
 def update(row, field, value):
         sql.execute("UPDATE links SET %s='%s' WHERE id='%s'" %(field, value, row))
 
-def select(field='id', value='', newUrl=False, skippin=False):
-    if newUrl:
-        sql.execute("SELECT * FROM links WHERE %s='%s' and LENGTH(linkedto) > 10" %(field, value))
-    elif skippin:
-        sql.execute("SELECT * FROM links WHERE %s='%s' and MOD(id, 4)=%s" %(field, value, skippin))
+def select(field='id', value='', skippin=0, minid=0):
+    if skippin != 0:
+        sql.execute("SELECT * FROM links WHERE %s='%s' and MOD(id, 4)=%s and id>%s" %(field, value, skippin, minid+1))
     elif value != '':
         sql.execute("SELECT * FROM links WHERE %s='%s'" %(field, value))
     else:
@@ -109,12 +106,13 @@ sql = mysql.cursor()
  # The initial URL to parse. Either a user-defined one or the first one in the table.
 start = 0
 manual=False
+skip=0
 if len(sys.argv)>1:
     skip = sys.argv[1]
     if skip not in ['1','2','3','4','5','6','7','8','9']:
         skipping=False
         start=skip
-        skip = False
+        skip = 0
     else:
         skip = int(skip)
     manual=True
@@ -130,12 +128,15 @@ if len(sys.argv)>1:
 
 
 # -----BEGIN PARSER BLOCK-----
-
+from urllib.request import FancyURLopener
+class Moz(FancyURLopener):
+    version = 'Mozilla/5.0 (Windows; U; Windows NT 5.1; it; rv:1.8.1.11)Gecko/20071127 Firefox/2.0.0.11'
+opener = Moz()
 def parse(url):
 
     # I request the HTML code.
     try:
-        html=urlopen(url, timeout=5).read().decode('ISO-8859-1')
+        html=opener.open(url).read().decode('ISO-8859-1')
     except:
         return 'crash',0,0,0,0
 
@@ -147,7 +148,8 @@ def parse(url):
     keywords = (re.findall( r"""<meta name="keywords" content=['"](.*?)['"]>""", html)+[''])[0]
     if title.count('>'):
         title=title[:title.find('>')]
-    description = (re.findall( r"""<meta name="description" content=['"](.*?)['"]\s+.*?>""", html)+[''])[0]
+    description = (re.findall( r"""<meta name="[Dd]escription" content=['"](.*?)['"]\s+.*?>""", html) + re.findall( r"""<meta name="[Dd]escription" content=['"](.*?)['"]>""", html) + \
+            re.findall( r"""<meta content=['"](.*?)['"] name=['"][Dd]escription['"]>""", html) + [''])[0]
     if description.count('>'):
         description=description[:description.find('>')]
     emails = (re.findall( r"""\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,4}\b""", html))
@@ -158,7 +160,7 @@ def parse(url):
     dom = domain(url)[0]
     if not title:
         title = dom
-    # Gets really messy from here (if it wasn't already messy enough for you).
+    # Gets really messy from here (if it wasn't already messy enough).
     i,h1 = 1, []
     while not len(h1) and i < 7:
         h1 = re.findall( r'<h%s>(.*?)</h%s>' %(i, i), html)
@@ -215,37 +217,42 @@ def checkUrl(url, link):
     return url
 
 def baseUrl(url):
+    if domain(url) == 'wikipedia' and (url[-5:]=='.org/' or url[-5:].count('.')==0):
+        return url
     if url[:4]=='http':
         return url[:url.find('/',8)+1]
     else:
         return checkUrl(url[url.find('@')+1:], '')
+linkId=0
+intup = 0
+def nuUrl(delf=False):
+    global skip,linkId, intup
+    start = select('parsed', '0', skip, linkId)[1]
+    linkId = getId(start)
+    update(linkId, 'parsed', '1')
+    if intup>1:
+        mysql.commit()
+        intup=0
+    intup += 1
+    return start
 
 
 if not start:
-    start = select('parsed', '0')[1]
+    start = nuUrl()
 try:
     while True:
         link = start
         linkId = getId(link)
-        print(linkId % 4)
         print(link)
         if not dbdomain(domain(link)[0]) and not manual:
-            update(linkId, 'parsed', '1')
-            if skip:
-                start = select('parsed', '0', skippin=skip)[1]
-            else:
-                start = select('parsed', '0', True)[1]
+            start = nuUrl()
             continue
         manual = False
-        mysql.commit()
         [linksl, title, keywords, description,h1] = parse(link)
         if linksl=='crash':
             print('404')
             delete(link)
-            if skip:
-                start = select('parsed', '0', skippin=skip)[1]
-            else:
-                start = select('parsed', '0', True)[1]
+            start = nuUrl(True)
             continue
 
         string = ""
@@ -279,12 +286,7 @@ try:
         update(linkId, 'title', str(title.replace("'",  '`')))
         update(linkId, 'descr', str(description.replace("'", '`')))
         update(linkId, 'h1', str(h1.replace("'", '`')))
-        if skip:
-            start = select('parsed', '0',skippin=skip)[1]
-        else:
-            start = select('parsed', '0', True)[1]
-        update(getId(start), 'parsed', '1')
-        #mysql.commit()
+        start = nuUrl()
 except KeyboardInterrupt:
     print('Saving...')
     update(linkId, 'parsed', '0')
