@@ -12,7 +12,7 @@
 # -----END HEADER BLOCK-----
 
 
-import sys,pymysql
+import sys,pymysql,math
 
 # -----BEGIN MYSQL BLOCK-----
 
@@ -31,11 +31,8 @@ def select(field=id, value=''):
         return ()
 
 def lookUp(string):
-    sql.execute("SELECT * FROM keywords WHERE word='" + string + "'")
+    sql.execute("SELECT * FROM keywords WHERE word LIKE '%" + string + "%'")# ORDER BY LENGTH(ids) DESC")
     resp = sql.fetchall()
-    if resp==():
-        sql.execute("SELECT * FROM keywords WHERE word LIKE '%" + string + "%' ORDER BY LENGTH(ids) DESC")
-        resp = sql.fetchall()
     return resp
 
 def email(address):
@@ -62,17 +59,36 @@ def look(lookup):
     global sql
 
     dicti = {}
-    resp = lookUp(lookup)
-    if not resp:
+    respi = lookUp(lookup)
+    if not respi:
         print('No results. Multiple words at a time are not yet supported.')
+        return False, False
     else:
-        for n in resp[0][1].split(', '):
-            whole = select('id', n)
-            if whole:
-                dicti[whole] = whole[3].count(',')
+        for resp in respi:
+            idl = resp[1].split(', ')
+            for n in idl:
+                whole = select('id', n)
+                if whole:
+                    if whole in dicti:
+                        dicti[whole] *= 1.3
+                    else:
+                        ret = 0
+                        for ids in whole[3].split(', '):
+                            idscore = select('id', ids)
+                            if idscore:
+                                idscore = len(idscore[3])
+                            else:
+                                idscore = 1
+                            idscore = (math.log(idscore, 10))
+                            if ids in idl:
+                                ret += 2+idscore
+                            else:
+                                ret += 0.5+idscore
+                        dicti[whole] = round(ret)
+                        #dicti[whole] = whole[3].count(',')
 
         ordl = sorted(dicti.items(), key=lambda x: x[1], reverse=True)
-        return ordl
+        return ordl, dicti
 # -----END LOOKUP BLOCK-----
 
 

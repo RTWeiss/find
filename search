@@ -21,16 +21,17 @@ if name:
     name = name.replace("'", '')
     print("<span class='subtle'>You searched for '%s'.<br /><br /></span>" %name)
     import find
-    ordl = find.look(name)
+    ordl, dicti = find.look(name)
     if ordl:
         for result in ordl[(current-1)*6:current*6]:
             result = result[0]
             title = result[4]
             if len(title) > 58:
                 title = title[:58] + '</a>...<a>'
-            print('<a class="rTitle" href="' + result[1] + '">'+title.replace('"', "'") + '</a><br />')
+            print('<a class="rTitle" href="' + result[1] + '">'+title.replace('`', "'") + '</a>')
+            print('<span class="subtle">   -   %s</span><br />' %dicti[result])
             print('<span class="rLink">'+ result[1] + '</span><br />')
-            print(   (result[5] + '<br />').strip(u'').replace('`', "'"))
+            print('<span class="descr">' + result[5].replace('`', "'") + '</span><br />')
             print('<br />')
         count = len(ordl)
         print('<span class="subtle"><br />About %s results (%.2f seconds)</span>' %(count, count/1100))

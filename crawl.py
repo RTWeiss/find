@@ -30,10 +30,12 @@ def delete(url):
 def update(row, field, value):
         sql.execute("UPDATE links SET %s='%s' WHERE id='%s'" %(field, value, row))
 
-def select(field='id', value='', newUrl=False):
+def select(field='id', value='', newUrl=False, skippin=False):
     if newUrl:
         sql.execute("SELECT * FROM links WHERE %s='%s' and LENGTH(linkedto) > 10" %(field, value))
-    if value != '':
+    elif skippin:
+        sql.execute("SELECT * FROM links WHERE %s='%s' and MOD(id, 4)=%s" %(field, value, skippin))
+    elif value != '':
         sql.execute("SELECT * FROM links WHERE %s='%s'" %(field, value))
     else:
         sql.execute("SELECT * FROM links")
@@ -57,8 +59,6 @@ def dbdomain(domain):
     x = sql.fetchall()
     if x == ():
         sql.execute("INSERT INTO domains(domain) VALUES('%s')" %(domain))
-        return True
-    if len(x) < 12:
         return True
     return False
 
@@ -108,8 +108,16 @@ mysql = pymysql.connect(user='testpy', db='crawler', charset='utf8')
 sql = mysql.cursor()
  # The initial URL to parse. Either a user-defined one or the first one in the table.
 start = 0
+manual=False
 if len(sys.argv)>1:
-    start = sys.argv[1]
+    skip = sys.argv[1]
+    if skip not in ['1','2','3','4','5','6','7','8','9']:
+        skipping=False
+        start=skip
+        skip = False
+    else:
+        skip = int(skip)
+    manual=True
     idstart = getId(start)
     if not idstart:
         insert(start)
@@ -137,10 +145,14 @@ def parse(url):
     links += re.findall( r"""<link\s+.*?href=['"](.*?)['"].*?(?:</link|/|)>""", html)
     title = (re.findall( r'<title>(.*?)</title>', html) + [''])[0]
     keywords = (re.findall( r"""<meta name="keywords" content=['"](.*?)['"]>""", html)+[''])[0]
+    if title.count('>'):
+        title=title[:title.find('>')]
     description = (re.findall( r"""<meta name="description" content=['"](.*?)['"]\s+.*?>""", html)+[''])[0]
+    if description.count('>'):
+        description=description[:description.find('>')]
     emails = (re.findall( r"""\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,4}\b""", html))
     for em in emails:
-        print(email)
+        print(em)
         email(url, em)
 
     dom = domain(url)[0]
@@ -208,29 +220,40 @@ def baseUrl(url):
     else:
         return checkUrl(url[url.find('@')+1:], '')
 
+
 if not start:
     start = select('parsed', '0')[1]
 try:
     while True:
         link = start
-        if not dbdomain(domain(link)[0]):
-            delete(link)
-            start = select('parsed', '0', True)[1]
-            continue
-        print(link)
         linkId = getId(link)
+        print(linkId % 4)
+        print(link)
+        if not dbdomain(domain(link)[0]) and not manual:
+            update(linkId, 'parsed', '1')
+            if skip:
+                start = select('parsed', '0', skippin=skip)[1]
+            else:
+                start = select('parsed', '0', True)[1]
+            continue
+        manual = False
+        mysql.commit()
         [linksl, title, keywords, description,h1] = parse(link)
         if linksl=='crash':
             print('404')
             delete(link)
-            start = select('parsed', '0')[1]
+            if skip:
+                start = select('parsed', '0', skippin=skip)[1]
+            else:
+                start = select('parsed', '0', True)[1]
             continue
 
         string = ""
-        for x in (title + keywords + description + h1):
+        for x in [title + ' ' + title + ' ' + keywords + ' ' + description + ' ' + h1]:
             string += ''.join([e for e in x.lower() if e.isalnum() or e==' '])
-        string = [x for x in set(string.split(' ')) if x != '']
-        string += [domain(link)[0]]
+        string = [x for x in string.split(' ') if x not in ['', ' ', 'the', 'of', 'or']]
+        for x in range(4):
+            string += [domain(link)[0]]
         if linksl:
             links = []
             for l in linksl:
@@ -252,14 +275,19 @@ try:
                     update(idh, 'linkedto', linkedto)
         for key in string:
             keyword(key, linkId)
-        update(linkId, 'parsed', '1')
+        #update(linkId, 'parsed', '1')
         update(linkId, 'title', str(title.replace("'",  '`')))
         update(linkId, 'descr', str(description.replace("'", '`')))
         update(linkId, 'h1', str(h1.replace("'", '`')))
-        start = select('parsed', '0', True)[1]
-        mysql.commit()
+        if skip:
+            start = select('parsed', '0',skippin=skip)[1]
+        else:
+            start = select('parsed', '0', True)[1]
+        update(getId(start), 'parsed', '1')
+        #mysql.commit()
 except KeyboardInterrupt:
     print('Saving...')
+    update(linkId, 'parsed', '0')
 
 # -----END CRAWLER BLOCK-----
 
