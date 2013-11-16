@@ -12,21 +12,42 @@ with open('html.html', 'r') as f:
     print(f.read())
 
 form = cgi.FieldStorage()
-name = form.getvalue('query')
+name = form.getvalue('q')
+current = form.getvalue('p')
+if not current:
+    current=1
+current = int(current)
 if name:
+    name = name.replace("'", '')
+    print("<span class='subtle'>You searched for '%s'.<br /><br /></span>" %name)
     import find
     ordl = find.look(name)
     if ordl:
-        for result in ordl[:6]:
+        for result in ordl[(current-1)*6:current*6]:
             result = result[0]
-            print('')
-            if result[4] != ' ':
-                print('<a class="rTitle" href="' + result[1] + '">'+result[4] + '</a><br />')
+            if result[4] != '':
+                print('<a class="rTitle" href="' + result[1] + '">'+result[4].replace('"', "'") + '</a><br />')
+            else:
+                print('<a class="rTitle" href="' + result[1] + '">'+result[1][7].upper()+result[1][8:result[1].find('.')] + '</a><br />')
             print('<span class="rLink">'+ result[1] + '</span><br />')
             if result[5] != ' ':
                 print(   (result[5] + '<br />').strip(u'').replace('`', "'"))
             print('<br />')
-        print('<a href="#">1</a> 2 3 4')
+        count = len(ordl)
+        print('<span class="subtle"><br />About %s results (%.2f seconds)</span>' %(count, count/1100))
+        dots=False
+        if count > 60:
+            count = 60
+            dots=True
+        pstring='<br /><br /><span class="subtle"> Goto: '
+        for x in range(round(count/6) + 1*(count%6>0)):
+            if x+1 == current:
+                pstring += ('<span style="color:black;">%s  </span>' %(current))
+            else:
+                pstring += '<a class="nextP" href="search?query=%s&p=%s">%s</a>  ' %(name, x+1, x+1)
+        if dots:
+            pstring += '...'
+        print(pstring + '</span>')
     find.sql.close()
 
 

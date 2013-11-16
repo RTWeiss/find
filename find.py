@@ -84,7 +84,7 @@ if __name__=='__main__':
         lookup = input('>>> ')
     ordl = look(lookup)
 
-    for result in ordl[:6]:
+    for result in ordl:
         result = result[0]
         print('')
         if result[4] != ' ':

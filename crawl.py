@@ -43,13 +43,14 @@ def select(field='id', value='', newUrl=False):
     else:
         return ()
 
-def insert(url, linkedto='0', title='', description=''):
+def insert(url, linkedto='0', title='', description='', h1=''):
     sql.execute("INSERT INTO links(url, parsed, linkedto, title, descr) VALUES('%s', 0, '%s', '%s', '%s')" %(url, linkedto, title, description))
 
 
 def email(address, site):
-    sql.execute("INSERT INTO emails(address, site) VALUES('%s', '%s')" %(address, site))
-
+    sql.execute("SELECT * FROM emails WHERE address='%s'" %address)
+    if sql.fetchall() == ():
+        sql.execute("INSERT INTO emails(address, site) VALUES('%s', '%s')" %(address, site))
 def keyword(word, url):
     sql.execute("SELECT * FROM keywords WHERE word='%s'" %(word))
     resp = sql.fetchall()
@@ -72,17 +73,16 @@ def getId(url):
 
 def reset():
     sql.execute("DROP TABLE IF EXISTS links")
-    sql.execute("DROP TABLE IF EXISTS emails")
+    #sql.execute("DROP TABLE IF EXISTS emails")
     sql.execute("DROP TABLE IF EXISTS keywords")
-    sql.execute("CREATE TABLE links(id INT PRIMARY KEY AUTO_INCREMENT, url VARCHAR(256), parsed TINYINT(1), linkedto TEXT, title VARCHAR(128), descr VARCHAR(256))")
-    sql.execute("CREATE TABLE emails(id INT PRIMARY KEY AUTO_INCREMENT, address VARCHAR(256), site VARCHAR(256))")
+    sql.execute("CREATE TABLE links(id INT PRIMARY KEY AUTO_INCREMENT, url VARCHAR(256), parsed TINYINT(1), linkedto TEXT, title VARCHAR(128), descr VARCHAR(256), h1 VARCHAR(256))")
+    #sql.execute("CREATE TABLE emails(id INT PRIMARY KEY AUTO_INCREMENT, address VARCHAR(256), site VARCHAR(256))")
     sql.execute("CREATE TABLE keywords(word VARCHAR(40), ids TEXT)")
 
  # Connection to the server
 
 mysql = pymysql.connect(user='testpy', db='crawler', charset='utf8')
 sql = mysql.cursor()
-
  # The initial URL to parse. Either a user-defined one or the first one in the table.
 start = 0
 if len(sys.argv)>1:
@@ -104,7 +104,7 @@ def parse(url):
 
     # I request the HTML code.
     try:
-        html=urlopen(url).read().decode('utf8')
+        html=urlopen(url, timeout=5).read().decode('ISO-8859-1')
     except:
         return 'crash',0,0,0,0
 
@@ -112,12 +112,24 @@ def parse(url):
 
     links = re.findall( r"""<a\s+.*?href=['"](.*?)['"].*?(?:</a|/)>""", html)
     links += re.findall( r"""<link\s+.*?href=['"](.*?)['"].*?(?:</link|/|)>""", html)
-    title = re.findall( r'<title>(.*?)</title>', html)
-    keywords = re.findall( r"""<meta name="keywords" content=['"](.*?)['"]>""", html)
-    description = re.findall( r"""<meta name="description" content=['"](.*?)['"/]>""", html)
-    h1 = re.findall( r'<h1>(.*?)</h1>', html)
+    title = (re.findall( r'<title>(.*?)</title>', html) + [''])[0]
+    keywords = (re.findall( r"""<meta name="keywords" content=['"](.*?)['"]>""", html)+[''])[0]
+    description = (re.findall( r"""<meta name="description" content=['"](.*?)['"]\s+.*?>""", html)+[''])[0]
 
-    return links, title, keywords, description, h1
+    # Gets really messy from here (if it wasn't already messy enough for you).
+    i,h1 = 1, []
+    while not len(h1) and i < 7:
+        h1 = re.findall( r'<h%s>(.*?)</h%s>' %(i, i), html)
+        i += 1
+    h1 = (h1 + [''])[0]
+    while h1.count('<'):
+        spot = h1.find('<')
+        h1 = h1[:spot]+h1[h1.find('>', spot)+1:]
+    ret = [links]
+    for ttl in [title, keywords, description, h1]:
+        ttl = ''.join(c for c in ttl if c in '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!"#$%&\'()*+,-./:;?@[\\]^_`{|}~ \t\n\r')
+        ret.append(ttl)
+    return ret
 
 # -----END PARSER BLOCK
 
@@ -126,31 +138,43 @@ def parse(url):
 
 # -----BEGIN CRAWLER BLOCK-----
 
+def domain(url):
+    subs = url[7:url.find('/', 8)]
+    subs = subs.split('.')
+    for x in range(len(subs)):
+        if len(subs[-x]) > 3:
+            return subs[-x]
+    return subs[0]
+
 def checkUrl(url, link):
+    if url[:11]=='javascript:' or '>' in url or '<' in url or '.' not in url or '{' in url or '}' in url:
+        return ''
     if url.find('?') != -1:
         url = url[:url.find('?')]
+    if url.find(':', 7) != -1:
+        url = url[:url.find(':', 7)]
     if url[:7]=='mailto:':
         url = url[7:]
         email(url, link)
         return url
-    elif url[:7]!='http://' and url[:8]!='https://':
+    url = url.replace('https://', 'http://')
+    if url[:1]=='/':
         url = link+url
     if url[:4] != 'http':
         url = 'http://'+url
     if url[-1] != '/':
         url += '/'
     ht = url.find('//') + 2
-    if url[ht:ht+4]=='www.':
-        url = url[:ht]+url[ht+4:]
-    if url[ht:ht+5]=='www1.':
-        url = url[:ht]+url[ht+5:]
-    if url[ht:ht+5]=='www2.':
-        url = url[:ht]+url[ht+5:]
+    for w in ['www.', 'www2.', 'www1.']:
+        if url[ht:ht+4]==w:
+            url = url[:ht]+url[ht+len(w):]
     if url[:url.find('/', ht)].count('.') > 1:
         end1 = url.find('.') + 1
         second = url[end1:url.find('.', end1)]
         if len(second) > 3 and second != 'tumblr':
             url = url[:ht] + url[end1:]
+    if domain(url) == domain(link):
+        return ''
     return url
 
 def baseUrl(url):
@@ -166,15 +190,13 @@ try:
         link = start
         print(link)
         linkId = getId(link)
-        linksl, title, keywords, description,h1 = parse(link)
+        [linksl, title, keywords, description,h1] = parse(link)
         if linksl=='crash':
+            print('404')
             delete(link)
             start = select('parsed', '0')[1]
             continue
 
-        for check in [title, keywords, description, h1]:
-            if not check:
-                check.append(' ')
         string = ""
         for x in (title + keywords + description + h1):
             string += ''.join([e for e in x.lower() if e.isalnum() or e==' '])
@@ -186,6 +208,8 @@ try:
                 if l not in links:
                     links.append(l)
             for linkn in links:
+                if linkn=='':
+                    continue
                 li = select('url', linkn)
                 print('\t%s' %linkn)
                 if len(li) == 0:
@@ -199,8 +223,9 @@ try:
         for key in string:
             keyword(key, linkId)
         update(linkId, 'parsed', '1')
-        update(linkId, 'title', str(title[0].replace("'", '"')))
-        update(linkId, 'descr', str(description[0].replace("'", '`')))
+        update(linkId, 'title', str(title.replace("'",  '`')))
+        update(linkId, 'descr', str(description.replace("'", '`')))
+        update(linkId, 'h1', str(h1.replace("'", '`')))
         start = select('parsed', '0', True)[1]
         mysql.commit()
 except KeyboardInterrupt:
