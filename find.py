@@ -31,8 +31,11 @@ def select(field=id, value=''):
         return ()
 
 def lookUp(string):
-    sql.execute("SELECT * FROM keywords WHERE word LIKE '%" + string + "%' ORDER BY LENGTH(ids) DESC")
+    sql.execute("SELECT * FROM keywords WHERE word='" + string + "'")
     resp = sql.fetchall()
+    if resp==():
+        sql.execute("SELECT * FROM keywords WHERE word LIKE '%" + string + "%' ORDER BY LENGTH(ids) DESC")
+        resp = sql.fetchall()
     return resp
 
 def email(address):

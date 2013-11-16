@@ -54,8 +54,11 @@ def email(address, site):
 
 def dbdomain(domain):
     sql.execute("SELECT * FROM domains WHERE domain='%s'" %domain)
-    if sql.fetchall() == ():
+    x = sql.fetchall()
+    if x == ():
         sql.execute("INSERT INTO domains(domain) VALUES('%s')" %(domain))
+        return True
+    if len(x) < 12:
         return True
     return False
 
@@ -81,10 +84,13 @@ def getId(url):
 def domain(url):
     subs = url[7:url.find('/', 8)]
     subs = subs.split('.')
+    ret = subs[0]
     for x in range(len(subs)):
         if len(subs[-x]) > 3:
-            return subs[-x]
-    return subs[0]
+            ret = subs[-x]
+    while subs[0] != ret:
+        subs.pop(0)
+    return subs[0], 'http://'+'.'.join(subs) + url[url.find('/', 8):]
 
 def reset():
     sql.execute("DROP TABLE IF EXISTS links")
@@ -100,7 +106,6 @@ def reset():
 
 mysql = pymysql.connect(user='testpy', db='crawler', charset='utf8')
 sql = mysql.cursor()
-reset()
  # The initial URL to parse. Either a user-defined one or the first one in the table.
 start = 0
 if len(sys.argv)>1:
@@ -138,7 +143,7 @@ def parse(url):
         print(email)
         email(url, em)
 
-    dom = domain(url)
+    dom = domain(url)[0]
     if not title:
         title = dom
     # Gets really messy from here (if it wasn't already messy enough for you).
@@ -183,6 +188,8 @@ def checkUrl(url, link):
         url = 'http://'+url
     if url[-1] != '/':
         url += '/'
+    #if url[-5:] == '.png/' or url[-5:] == '.jpg/' or url[-5:] == '.gif/':
+     #   return ''
     ht = url.find('//') + 2
     for w in ['www.', 'www2.', 'www1.']:
         if url[ht:ht+4]==w:
@@ -192,6 +199,7 @@ def checkUrl(url, link):
         second = url[end1:url.find('.', end1)]
         if len(second) > 3 and second != 'tumblr':
             url = url[:ht] + url[end1:]
+    url = domain(url)[1]
     return url
 
 def baseUrl(url):
@@ -205,7 +213,7 @@ if not start:
 try:
     while True:
         link = start
-        if not dbdomain(domain(link)):
+        if not dbdomain(domain(link)[0]):
             delete(link)
             start = select('parsed', '0', True)[1]
             continue
@@ -222,7 +230,7 @@ try:
         for x in (title + keywords + description + h1):
             string += ''.join([e for e in x.lower() if e.isalnum() or e==' '])
         string = [x for x in set(string.split(' ')) if x != '']
-        string += [domain(link)]
+        string += [domain(link)[0]]
         if linksl:
             links = []
             for l in linksl:
