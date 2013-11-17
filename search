@@ -13,13 +13,15 @@ with open('html.html', 'r') as f:
 
 form = cgi.FieldStorage()
 name = form.getvalue('q')
+if name:
+    name = name.replace("'", '')
+name = name.split(',')
 current = form.getvalue('p')
 if not current:
     current=1
 current = int(current)
 if name:
-    name = name.replace("'", '')
-    print("<span class='subtle'>You searched for '%s'.<br /><br /></span>" %name)
+    print("<span class='subtle'>You searched for '%s'.<br /><br /></span>" %' '.join(name))
     import find
     ordl, dicti = find.look(name)
     if ordl:
@@ -28,13 +30,15 @@ if name:
             title = result[4]
             if len(title) > 58:
                 title = title[:58] + '</a>...<a>'
+            title = ' '.join([word if word.lower() not in name else ('<b>%s</b>' %word) for word in title.split(' ')])
             print('<a class="rTitle" href="' + result[1] + '">'+title.replace('`', "'") + '</a>')
             print('<span class="subtle">   -   %s</span><br />' %dicti[result])
             print('<span class="rLink">'+ result[1] + '</span><br />')
-            print('<span class="descr">' + result[5].replace('`', "'") + '</span><br />')
+            descr = ' '.join([word if word.lower() not in name else ('<b>%s</b>' %word) for word in result[5].split(' ')])
+            print('<span class="descr">' + descr.replace('`', "'") + '</span><br />')
             print('<br />')
         count = len(ordl)
-        print('<span class="subtle"><br />About %s results (%.2f seconds)</span>' %(count, count/1100))
+        print('<span class="subtle"><br />About %s results (%.2f seconds)</span>' %(count, count/221))
         dots=False
         if count > 60:
             count = 60

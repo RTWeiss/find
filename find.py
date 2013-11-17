@@ -31,7 +31,7 @@ def select(field=id, value=''):
         return ()
 
 def lookUp(string):
-    sql.execute("SELECT * FROM keywords WHERE word LIKE '%" + string + "%'")# ORDER BY LENGTH(ids) DESC")
+    sql.execute("SELECT * FROM keywords WHERE word LIKE '%" + string + "%' ORDER BY LENGTH(ids) DESC")
     resp = sql.fetchall()
     return resp
 
@@ -57,66 +57,50 @@ sql = mysql.cursor()
 
 def look(lookup):
     global sql
-
+    lookup = lookup[0]
     dicti = {}
     resplist=[]
     respi = ''
     #for x in lookup.split(' '):
     #    xlookup = lookUp(x)[0]
     #    resplist.append(xlookup)
-    #    respi += xlookup[1]
-    respi=lookUp(lookup)
+    #    respi += xlookup[1[
+
+    respi=[x for y in lookUp(lookup) for x in y[1].split(', ')] # Create a list of ids from each keyword
+    respi = [(a, respi.count(a)) for a in set(respi)] # Count each one
+    respi = sorted(respi, key=lambda x: x[1], reverse=True) # Sort them
+
     if not respi:
         print('No results. Multiple words at a time are not yet supported.')
         return False, False
     else:
-        for resp in respi:
-            idl = resp[1].split(', ')
-            for n in idl:
-                whole = select('id', n)
-                if whole:
-                    if whole in dicti:
-                        dicti[whole] *= 1.3
+        for n in respi[:round(len(respi))]:
+            whole = select('id', n[0])
+            if whole:
+                ret = 2
+                for ids in whole[3].split(', '):
+                    idscore = select('id', ids)
+                    if idscore:
+                        idscore = len(idscore[3])
                     else:
-                        ret = 0
-                        for ids in whole[3].split(', '):
-                            idscore = select('id', ids)
-                            if idscore:
-                                idscore = len(idscore[3])
-                            else:
-                                idscore = 1
-                            idscore = (math.log(idscore, 10))
-                            if ids in idl:
-                                ret += 2+idscore
-                            else:
-                                ret += 0.5+idscore
-                        dicti[whole] = round(ret)
-                        #dicti[whole] = whole[3].count(',')
+                        idscore = 1
+                    idscore = (math.log(idscore, 10))
+                    if ids in respi:
+                        ret += 2+idscore
+                    else:
+                        ret += 0.5+idscore
+                dicti[whole] = round(ret * 1.3*(n[1]-1))
 
         ordl = sorted(dicti.items(), key=lambda x: x[1], reverse=True)
         return ordl, dicti
+
 # -----END LOOKUP BLOCK-----
 
 
 
 # -----BEGIN FOOTER BLOCK-----
-if __name__=='__main__':
-    if len(sys.argv)>1:
-        lookup=''
-        #for x in range(len(sys.argv)-1):
-        lookup = sys.argv[1]
-    else:
-        lookup = input('>>> ')
-    ordl = look(lookup)
 
-    for result in ordl:
-        result = result[0]
-        print('')
-        if result[4] != ' ':
-            print(result[4])
-        if result[5] != ' ':
-            print(result[5])
-        print('\033[95m'+result[1]+'\033[0m')
+if __name__=='__main__':
     sql.close()
 
 # -----END FOOTER BLOCK-----

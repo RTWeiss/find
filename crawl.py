@@ -230,9 +230,9 @@ def nuUrl(delf=False):
     start = select('parsed', '0', skip, linkId)[1]
     linkId = getId(start)
     update(linkId, 'parsed', '1')
-    if intup>1:
+    if intup%1==0:
         mysql.commit()
-        intup=0
+    print(intup)
     intup += 1
     return start
 
