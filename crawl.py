@@ -31,7 +31,8 @@ def update(row, field, value):
 
 def select(field='id', value='', skippin=0, minid=0):
     if skippin != 0:
-        sql.execute("SELECT * FROM links WHERE %s='%s' and MOD(id, 4)=%s and id>%s" %(field, value, skippin, minid+1))
+        #sql.execute("SELECT * FROM links WHERE %s='%s' and MOD(id, 4)=%s and id>%s and url like 'http://wikipedia.org/wiki/"%(field, value, skippin, minid+1) + "%'")
+        sql.execute("SELECT * FROM links WHERE %s='%s' and id>%s and url like 'http://wikipedia.org/wiki/"%(field, value, minid+1) + "%'")
     elif value != '':
         sql.execute("SELECT * FROM links WHERE %s='%s'" %(field, value))
     else:
@@ -57,7 +58,7 @@ def dbdomain(domain):
     if x == ():
         sql.execute("INSERT INTO domains(domain) VALUES('%s')" %(domain))
         return True
-    return False
+    return True
 
 def keyword(word, url):
     sql.execute("SELECT * FROM keywords WHERE word='%s'" %(word))
@@ -161,14 +162,12 @@ def parse(url):
     if not title:
         title = dom
     # Gets really messy from here (if it wasn't already messy enough).
-    i,h1 = 1, []
-    while not len(h1) and i < 7:
-        h1 = re.findall( r'<h%s>(.*?)</h%s>' %(i, i), html)
-        i += 1
-    h1 = (h1 + [''])[0]
+    h1 = (re.findall( r'<p.*?>(.*?)</p>', html, flags=re.DOTALL)+[''])[0]
     while h1.count('<'):
         spot = h1.find('<')
         h1 = h1[:spot]+h1[h1.find('>', spot)+1:]
+    if len(h1.split(' ')) > 25:
+        h1 = ' '.join(h1.split(' ')[:25]) + '...'
     if not description:
         description = dom[0].upper() + dom[1:] + ' - ' + h1
     ret = [links]
@@ -185,10 +184,12 @@ def parse(url):
 # -----BEGIN CRAWLER BLOCK-----
 
 def checkUrl(url, link):
-    if url[:11]=='javascript:' or '>' in url or '<' in url or '.' not in url or '{' in url or '}' in url:
+    if url[:11]=='javascript:' or '>' in url or '<' in url  or '{' in url or '}' in url or '%' in url:
         return ''
     if url.find('?') != -1:
         url = url[:url.find('?')]
+    if url.find('#') != -1:
+        url = url[:url.find('#')]
     if url.find(':', 7) != -1:
         url = url[:url.find(':', 7)]
     if url[:7]=='mailto:':
@@ -197,7 +198,7 @@ def checkUrl(url, link):
         return url
     url = url.replace('https://', 'http://')
     if url[:1]=='/':
-        url = link+url
+        url = link[:link.find('/', 8) + 1]+url[1:]
     if url[:4] != 'http':
         url = 'http://'+url
     if url[-1] != '/':
@@ -217,8 +218,8 @@ def checkUrl(url, link):
     return url
 
 def baseUrl(url):
-    if domain(url) == 'wikipedia' and (url[-5:]=='.org/' or url[-5:].count('.')==0):
-        return url
+    if url[:26]=='http://wikipedia.org/wiki/' and url.count('_')<1 :
+        return url[:-1]
     if url[:4]=='http':
         return url[:url.find('/',8)+1]
     else:
@@ -229,7 +230,10 @@ def nuUrl(delf=False):
     global skip,linkId, intup
     start = select('parsed', '0', skip, linkId)[1]
     linkId = getId(start)
-    update(linkId, 'parsed', '1')
+    if delf:
+        update(linkId, 'parsed', '2')
+    else:
+        update(linkId, 'parsed', '1')
     if intup%1==0:
         mysql.commit()
     print(intup)
@@ -251,14 +255,10 @@ try:
         [linksl, title, keywords, description,h1] = parse(link)
         if linksl=='crash':
             print('404')
-            delete(link)
             start = nuUrl(True)
             continue
 
-        string = ""
-        for x in [title + ' ' + title + ' ' + keywords + ' ' + description + ' ' + h1]:
-            string += ''.join([e for e in x.lower() if e.isalnum() or e==' '])
-        string = [x for x in string.split(' ') if x not in ['', ' ', 'the', 'of', 'or']]
+        string = re.findall(r"[\w]+", (title + ' ' + title + ' ' + keywords + ' ' + description + ' ' + h1).lower())
         for x in range(4):
             string += [domain(link)[0]]
         if linksl:

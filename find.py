@@ -57,23 +57,39 @@ sql = mysql.cursor()
 
 def look(lookup):
     global sql
-    lookup = lookup[0]
     dicti = {}
     resplist=[]
-    respi = ''
+    respi = []
+    allresp=[]
     #for x in lookup.split(' '):
     #    xlookup = lookUp(x)[0]
     #    resplist.append(xlookup)
     #    respi += xlookup[1[
-
-    respi=[x for y in lookUp(lookup) for x in y[1].split(', ')] # Create a list of ids from each keyword
-    respi = [(a, respi.count(a)) for a in set(respi)] # Count each one
+    for lkup in lookup:
+        lookedUp = lookUp(lkup)
+        temp = [x for y in lookedUp for x in set(y[1].split(', '))] # Create a list of ids from each keyword
+        allresp += [x for y in lookedUp for x in y[1].split(', ')]
+        if respi != []:
+            respi = [x for x in temp if x in respi]
+        else:
+            respi = temp
+    i = 0
+    badres = False
+    while not respi and i < len(lookup):
+        badres = True
+        respi = [x for y in lookUp(lookup[i]) for x in y[1].split(', ')]
+        i += 1
+    word = lookup[i-1]
+    respi = [(a, allresp.count(a)) for a in set(respi)] # Count each one
     respi = sorted(respi, key=lambda x: x[1], reverse=True) # Sort them
-
     if not respi:
-        print('No results. Multiple words at a time are not yet supported.')
+        print("<span class='subtle'>No results for '%s'.</span></br /><br />" %' '.join(lookup))
         return False, False
     else:
+        if badres:
+            print("<span class='subtle'>No results for '%s'. Searching for '%s' instead.</span></br /><br />" %(' '.join(lookup),word))
+        else:
+            print("<span class='subtle'>You searched for '%s'.</span></br /><br />" %' '.join(lookup))
         for n in respi[:round(len(respi))]:
             whole = select('id', n[0])
             if whole:
