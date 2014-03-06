@@ -2,7 +2,7 @@ find
 ====
 
 Try it here:
-[find.noahingham.com](http://noahingham.com/find/search)
+[find.noahingham.com](http://noahingham.com/run/find)
 
 A Python Web Crawler and Search Engine, using MySQL.
 
