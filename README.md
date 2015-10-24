@@ -3,6 +3,7 @@ find
 
 Try it here:
 [find.noahingham.com](http://noahingham.com/run/find)
+UPDATE: I now use static hosting on Github Pages, so the link no longer works.
 
 A Python Web Crawler and Search Engine, using MySQL.
 
@@ -21,4 +22,7 @@ The only exceptions are Wikipedia and Tumblr.
 
 You can try it live (see above), but here is a screenshot:
 
-![alt text](http://i.imgur.com/hklFZnI.png)
+![Picture 1](http://i.imgur.com/hklFZnI.png)
+
+A more recent shot:
+![Picture 2](http://i.imgur.com/hUMIPwQ.png)
